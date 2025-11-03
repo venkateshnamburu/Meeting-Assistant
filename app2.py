@@ -1,71 +1,112 @@
-# meeting_assistant_fast.py
-# ---------------------------------------------
-# 🎧 Smart Meeting Transcriber (Fast Version)
-# Whisper + Streamlit
-# ---------------------------------------------
+# fast_transcriber_with_progress.py
+# ---------------------------------------------------
+# ⚡ Fast Meeting Transcriber (Groq + Whisper + Chunked + Progress Bar)
+# ---------------------------------------------------
 
 import streamlit as st
-import whisper
+from groq import Groq
+from pydub import AudioSegment
 import tempfile
 import os
-import subprocess
+import math
+import time
 
-# -----------------------
-# App Config
-# -----------------------
-st.set_page_config(page_title="Smart Meeting Transcriber", page_icon="🎧", layout="wide")
-st.title("🎧 Smart Meeting Transcriber")
-st.caption("Upload your meeting recording → Get instant transcript (no summary, no Q&A)")
+# ---------------------------
+# Streamlit Page Setup
+# ---------------------------
+st.set_page_config(page_title="Fast Meeting Transcriber", page_icon="⚡", layout="wide")
+st.title("⚡ Fast Meeting Transcriber")
+st.caption("Upload long audio → Auto-split → Transcribe instantly with Groq Whisper")
 
-# -----------------------
-# Function: Check ffmpeg
-# -----------------------
-def check_ffmpeg():
-    """Check if ffmpeg is installed on the system."""
-    try:
-        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return True
-    except FileNotFoundError:
-        return False
+# ---------------------------
+# Groq API Setup
+# ---------------------------
+API_KEY = "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"
 
-if not check_ffmpeg():
-    st.error("⚠️ FFmpeg not found! Please install it first.\n\n"
-             "➡️ Windows: Download from https://ffmpeg.org/download.html and add it to PATH.")
+if not API_KEY:
+    st.error("❌ Groq API key not found! Please set it as an environment variable or in Streamlit secrets.")
+    st.info("Get your free API key from https://console.groq.com/keys")
     st.stop()
 
-# -----------------------
-# Audio Upload
-# -----------------------
-audio_file = st.file_uploader("🎤 Upload your meeting recording", type=["mp3", "wav", "m4a"])
+client = Groq(api_key=API_KEY)
 
-# -----------------------
-# Transcription with Whisper
-# -----------------------
+# ---------------------------
+# Helper Function: Split Audio
+# ---------------------------
+def split_audio(file_path, max_size_mb=23):
+    """Split large audio into smaller chunks under given MB size."""
+    audio = AudioSegment.from_file(file_path)
+    duration_ms = len(audio)
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+
+    num_parts = math.ceil(file_size_mb / max_size_mb)
+    chunk_length = duration_ms / num_parts
+
+    chunks = []
+    for i in range(num_parts):
+        start = i * chunk_length
+        end = (i + 1) * chunk_length
+        chunk = audio[start:end]
+        tmp_chunk = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        chunk.export(tmp_chunk.name, format="mp3")
+        chunks.append(tmp_chunk.name)
+    return chunks
+
+# ---------------------------
+# Transcription Logic
+# ---------------------------
+audio_file = st.file_uploader("🎤 Upload meeting audio file", type=["mp3", "wav", "m4a"])
+
 if audio_file is not None:
-    st.info("🔄 Transcribing audio... please wait (duration-based timing, usually 1x–2x real-time)")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-        tmp_file.write(audio_file.read())
-        tmp_path = tmp_file.name
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+        tmp.write(audio_file.read())
+        tmp_path = tmp.name
 
-    # Use the smallest model for speed
-    model = whisper.load_model("tiny")  # Options: tiny, base, small, medium, large
-    result = model.transcribe(tmp_path)
-    transcript_text = result["text"]
+    st.info("🔄 Processing... splitting large file if needed")
+    chunks = split_audio(tmp_path)
 
-    st.success("✅ Transcription complete!")
-    st.subheader("🗒️ Transcript")
-    st.text_area("Full Transcript", transcript_text, height=350)
+    total_chunks = len(chunks)
+    st.write(f"🔹 Audio split into {total_chunks} part(s) for processing")
 
-    # Optionally allow download
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    full_transcript = ""
+
+    for idx, chunk_path in enumerate(chunks, start=1):
+        status_text.text(f"⏳ Transcribing chunk {idx}/{total_chunks}...")
+        with open(chunk_path, "rb") as f:
+            try:
+                result = client.audio.transcriptions.create(
+                    model="whisper-large-v3",
+                    file=f
+                )
+                full_transcript += result.text + "\n"
+            except Exception as e:
+                st.error(f"❌ Error on chunk {idx}: {e}")
+
+        # Update progress bar
+        progress = int((idx / total_chunks) * 100)
+        progress_bar.progress(progress)
+        time.sleep(0.3)
+
+    status_text.text("✅ Transcription complete!")
+    progress_bar.progress(100)
+
+    # ---------------------------
+    # Display Results
+    # ---------------------------
+    st.subheader("🗒️ Full Transcript")
+    st.text_area("Transcribed Text", full_transcript, height=300)
+
     st.download_button(
-        label="⬇️ Download Transcript as TXT",
-        data=transcript_text,
+        label="📥 Download Transcript as TXT",
+        data=full_transcript,
         file_name="meeting_transcript.txt",
         mime="text/plain"
     )
 
-# -----------------------
+# ---------------------------
 # Footer
-# -----------------------
+# ---------------------------
 st.divider()
-st.caption("Built with ⚡ Whisper + Streamlit | Optimized for Speed")
+st.caption("Built with ⚡ Groq Whisper + Streamlit | Auto-chunked for long audio | Progress bar enabled")
