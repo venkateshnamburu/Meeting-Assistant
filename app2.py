@@ -5,6 +5,13 @@
 
 import streamlit as st
 from groq import Groq
+import sys
+
+# --- Compatibility Patch for Python 3.13 (pyaudioop missing) ---
+if sys.version_info >= (3, 13):
+    import audioop
+    sys.modules['pyaudioop'] = audioop
+
 from pydub import AudioSegment
 import tempfile
 import os
