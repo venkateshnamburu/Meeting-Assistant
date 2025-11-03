@@ -2,6 +2,9 @@ streamlit
 openai-whisper 
 google-genai
 torch
+groq
+pydub
+
 
 
 
