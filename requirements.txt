@@ -2,5 +2,6 @@ streamlit
 openai-whisper 
 google-genai
 torch
-google-generativeai
+
+
 
