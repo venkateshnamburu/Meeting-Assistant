@@ -117,3 +117,4 @@ if audio_file is not None:
 # ---------------------------
 st.divider()
 st.caption("Built with ⚡ Groq Whisper + Streamlit | Auto-chunked for long audio | Progress bar enabled")
+
