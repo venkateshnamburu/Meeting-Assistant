@@ -62,13 +62,19 @@ def split_audio(file_path, max_size_mb=23):
 # ---------------------------
 # Transcription Logic
 # ---------------------------
-audio_file = st.file_uploader("🎤 Upload meeting audio file", type=["mp3", "wav", "m4a"])
+audio_file = st.file_uploader(
+    "🎤 Upload meeting audio file",
+    type=["mp3", "wav", "m4a", "mp4", "mpeg", "mp4a"]
+)
 
 if audio_file is not None:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+    file_extension = audio_file.name.split(".")[-1]
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as tmp:
         tmp.write(audio_file.read())
         tmp_path = tmp.name
 
+    
     st.info("🔄 Processing... splitting large file if needed")
     chunks = split_audio(tmp_path)
 
