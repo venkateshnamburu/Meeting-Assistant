@@ -28,7 +28,7 @@ st.caption("Upload long audio → Auto-split → Transcribe instantly with Groq 
 # ---------------------------
 # Groq API Setup
 # ---------------------------
-API_KEY = "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"
+API_KEY = "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"
 
 if not API_KEY:
     st.error("❌ Groq API key not found! Please set it as an environment variable or in Streamlit secrets.")
